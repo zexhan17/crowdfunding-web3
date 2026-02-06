@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id             String        @id @default(cuid())
+  walletAddress  String        @unique
+  email          String?
+  username       String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  
+  campaigns      Campaign[]
+  transactions   Transaction[]
+  
+  @@index([walletAddress])
+}
+
+model Campaign {
+  id              String        @id @default(cuid())
+  creatorWallet   String
+  creator         User          @relation(fields: [creatorWallet], references: [walletAddress])
+  
+  title           String
+  description     String        @db.Text
+  goalAmount      String        // Store as string to handle big numbers
+  currentAmount   String        @default("0")
+  status          CampaignStatus @default(ACTIVE)
+  
+  email           String
+  deadline        DateTime?
+  category        String?
+  imageUrl        String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  fulfilledAt     DateTime?
+  
+  transactions    Transaction[]
+  milestones      Milestone[]
+  updates         CampaignUpdate[]
+  
+  @@index([creatorWallet])
+  @@index([status])
+}
+
+model Transaction {
+  id              String        @id @default(cuid())
+  campaignId      String
+  campaign        Campaign      @relation(fields: [campaignId], references: [id])
+  
+  donorWallet     String
+  donor           User          @relation(fields: [donorWallet], references: [walletAddress])
+  
+  amount          String        // Store as string to handle big numbers
+  transactionHash String        @unique
+  blockNumber     String?
+  isAnonymous     Boolean       @default(false)
+  
+  createdAt       DateTime      @default(now())
+  
+  @@index([campaignId])
+  @@index([donorWallet])
+  @@index([transactionHash])
+}
+
+model Milestone {
+  id              String        @id @default(cuid())
+  campaignId      String
+  campaign        Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  title           String
+  description     String?
+  targetAmount    String
+  order           Int
+  isReached       Boolean       @default(false)
+  reachedAt       DateTime?
+  
+  createdAt       DateTime      @default(now())
+  
+  @@index([campaignId])
+}
+
+model CampaignUpdate {
+  id              String        @id @default(cuid())
+  campaignId      String
+  campaign        Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  title           String
+  content         String        @db.Text
+  
+  createdAt       DateTime      @default(now())
+  
+  @@index([campaignId])
+}
+
+enum CampaignStatus {
+  ACTIVE
+  FULFILLED
+  FAILED
+  CLOSED
+}
