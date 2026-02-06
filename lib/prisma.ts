@@ -1,11 +1,16 @@
-import { PrismaClient } from '@prisma/client'
+import * as PrismaClientPkg from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
 
 const globalForPrisma = globalThis as unknown as {
-    prisma: PrismaClient | undefined
+    prisma: any | undefined
     pool: Pool | undefined
 }
+
+// `@prisma/client`'s exports can vary across build environments; access via
+// the module namespace and cast to `any` to avoid a strict named-import
+// resolution error during the Next.js TypeScript build on Vercel.
+const PrismaClientCtor = (PrismaClientPkg as any).PrismaClient
 
 // Create pg pool with increased timeouts matching DATABASE_URL params.
 // Increase max connections and timeouts to improve stability with remote poolers.
@@ -24,7 +29,7 @@ const adapter = new PrismaPg(pool)
 
 export const prisma =
     globalForPrisma.prisma ??
-    new PrismaClient({
+    new PrismaClientCtor({
         adapter,
         // In development, show warnings but avoid repeating every transient error
         log: process.env.NODE_ENV === 'development' ? ['warn'] : ['error'],
