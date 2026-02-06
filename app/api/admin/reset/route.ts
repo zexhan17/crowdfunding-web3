@@ -22,7 +22,7 @@ export async function POST(req: Request) {
         })
 
         // Find campaigns created by non-seed creators
-        const campaignsToDelete = await prisma.campaign.findMany({
+        const campaignsToDelete: { id: string }[] = await prisma.campaign.findMany({
             where: { creatorWallet: { notIn: seedWallets } },
             select: { id: true },
         })
@@ -35,9 +35,13 @@ export async function POST(req: Request) {
             await prisma.campaign.deleteMany({ where: { id: { in: campaignIds } } })
         }
 
-        // Remove any leftover milestones/updates that somehow remain
-        await prisma.milestone.deleteMany({ where: { campaignId: { notIn: campaignIds } } }).catch(() => { })
-        await prisma.campaignUpdate.deleteMany({ where: { campaignId: { notIn: campaignIds } } }).catch(() => { })
+        // Remove any leftover milestones/updates that somehow remain.
+        // Guard against empty `campaignIds` arrays which can produce an
+        // invalid Prisma `notIn: []` invocation in some environments.
+        if (campaignIds.length > 0) {
+            await prisma.milestone.deleteMany({ where: { campaignId: { notIn: campaignIds } } }).catch(() => { })
+            await prisma.campaignUpdate.deleteMany({ where: { campaignId: { notIn: campaignIds } } }).catch(() => { })
+        }
 
         // Delete users that are not seed users
         await prisma.user.deleteMany({ where: { walletAddress: { notIn: seedWallets } } })
