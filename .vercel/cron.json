@@ -1,0 +1,8 @@
+[
+    {
+        "path": "/api/cron/reset",
+        "schedule": "0 3 * * *",
+        "method": "POST",
+        "name": "daily-reset"
+    }
+]
