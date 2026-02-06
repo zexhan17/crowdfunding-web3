@@ -44,18 +44,39 @@ const DUMMY_ACHIEVEMENTS = [
 ]
 
 export function AchievementsClient() {
-    const { isConnected } = useAccount()
+    const { isConnected, address } = useAccount()
     const [mounted, setMounted] = useState(false)
     const [items, setItems] = useState(() => DUMMY_ACHIEVEMENTS.map((a) => ({ ...a })))
+    const [userItems, setUserItems] = useState<any[]>([])
     const [amounts, setAmounts] = useState<Record<string, string>>({})
 
     useEffect(() => {
         setMounted(true)
     }, [])
 
-    // Prevent rendering during the first client render to avoid
-    // hydration mismatches with the server HTML.
-    if (!mounted || !isConnected) return null
+    // When the user connects, fetch their fulfilled campaigns and show them.
+    useEffect(() => {
+        if (!isConnected || !address) {
+            setUserItems([])
+            return
+        }
+
+        let alive = true
+            ; (async () => {
+                try {
+                    const res = await fetch(`/api/achievements/user?wallet=${address}`)
+                    const json = await res.json()
+                    if (!alive) return
+                    if (Array.isArray(json.campaigns)) {
+                        setUserItems(json.campaigns)
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch user achievements', e)
+                }
+            })()
+
+        return () => { alive = false }
+    }, [isConnected, address])
 
     const handleDemoFund = (id: string) => {
         const val = amounts[id]
@@ -80,8 +101,53 @@ export function AchievementsClient() {
         }
     }
 
+    // Prevent rendering during the first client render to avoid
+    // hydration mismatches with the server HTML.
+    if (!mounted) return null
+
     return (
         <div className="mt-10">
+            {isConnected && userItems.length > 0 && (
+                <div className="mb-6">
+                    <h2 className="text-2xl font-semibold">Your Achievements</h2>
+                    <p className="text-sm text-muted-foreground">Campaigns you created that reached their goals.</p>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
+                        {userItems.map((a) => {
+                            const current = parseFloat(formatEther(BigInt(a.currentAmount)))
+                            const goal = parseFloat(formatEther(BigInt(a.goalAmount)))
+                            const progress = goal > 0 ? (current / goal) * 100 : 0
+
+                            return (
+                                <Card key={a.id} className="h-full">
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between gap-2">
+                                            <CardTitle className="line-clamp-2">{a.title}</CardTitle>
+
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className="text-sm text-muted-foreground line-clamp-3 mb-4">{a.description}</p>
+
+                                        <div className="space-y-2 mb-4">
+                                            <div className="flex justify-between text-sm">
+                                                <span className="font-semibold">{current.toFixed(4)} ETH</span>
+                                                <span className="text-muted-foreground">of {goal.toFixed(4)} ETH</span>
+                                            </div>
+                                            <Progress value={Math.min(progress, 100)} />
+                                            <div className="flex justify-between text-xs text-muted-foreground">
+                                                <span>{progress.toFixed(1)}% funded</span>
+                                                <span>{a._count?.transactions ?? 0} backers</span>
+                                            </div>
+                                        </div>
+
+                                    </CardContent>
+                                </Card>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
             <div className="mb-4">
                 <h2 className="text-2xl font-semibold">Demo Achievements</h2>
                 <p className="text-sm text-muted-foreground">These achievements are dummy data for demo purposes.</p>
